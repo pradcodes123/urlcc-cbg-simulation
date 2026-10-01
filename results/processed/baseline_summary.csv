@@ -1,0 +1,2 @@
+n,mean_preempted_positions,mean_affected_cb_count,mean_affected_cbg_count,mean_failed_cbg_count,mean_retransmission_positions,mean_retransmission_overhead,mean_embb_delivery_efficiency
+30,0.0,0.0,0.0,0.0,0.0,0.0,1.0
