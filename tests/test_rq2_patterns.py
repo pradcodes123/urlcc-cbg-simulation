@@ -13,8 +13,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config.simulation import MEDIUM_URLLC_ARRIVAL_RATE  # noqa: E402
-from experiments.rq2_patterns import (CSV_COLUMNS, PATTERNS, run_rq2,  # noqa: E402
-                                      save_rq2_results)
+from experiments.rq2_patterns import (  # noqa: E402
+    CSV_COLUMNS,
+    PATTERNS,
+    PREEMPTION_FRACTION,
+    run_rq2,
+    save_rq2_results,
+)
+
+expected_count = round(288 * PREEMPTION_FRACTION)
+expected_fraction = expected_count / 288
 
 
 class TestRq2(unittest.TestCase):
@@ -56,7 +64,7 @@ class TestRq2(unittest.TestCase):
     def test_same_preemption_fraction_for_all_patterns(self):
         fractions = {r["preemption_fraction"] for r in self.rows}
         self.assertEqual(len(fractions), 1)
-        self.assertAlmostEqual(fractions.pop(), round(288 * 0.10) / 288)
+        self.assertAlmostEqual(fractions.pop(), expected_fraction)
 
     def test_preempted_positions_identical_across_patterns_per_run(self):
         for run in range(5):
@@ -64,7 +72,7 @@ class TestRq2(unittest.TestCase):
                 counts = {self.by_pattern(p)[run]["preempted_positions"] for p in PATTERNS}
                 seeds = {self.by_pattern(p)[run]["seed"] for p in PATTERNS}
                 self.assertEqual(len(counts), 1)
-                self.assertEqual(counts.pop(), 29)
+                self.assertEqual(counts.pop(), expected_count)
                 self.assertEqual(seeds, {run})
 
     def test_results_deterministic_for_same_base_seed(self):

@@ -1,6 +1,9 @@
-"""Exploratory plots for the URLLC-CBG simulation experiments.
+"""Meaningful descriptive plots for the URLLC-CBG simulation experiments.
 
-Uses Matplotlib defaults and produces descriptive figures only.
+The plots show individual simulation runs together with the mean and
+standard deviation for each experimental condition.
+
+No inferential statistics or hypothesis testing are performed here.
 """
 
 from __future__ import annotations
@@ -8,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from analysis.analyze_results import (
@@ -20,6 +24,9 @@ from analysis.analyze_results import (
 
 FIGURES_DIR = Path("results/figures")
 
+# Fixed jitter makes the figures reproducible.
+JITTER_SEED = 42
+
 
 def _save(
         fig: plt.Figure,
@@ -28,14 +35,52 @@ def _save(
 ) -> Path:
     """Save and close a figure."""
     output_dir.mkdir(parents=True, exist_ok=True)
+
     path = output_dir / filename
+
     fig.tight_layout()
-    fig.savefig(path, dpi=200, bbox_inches="tight")
+    fig.savefig(
+        path,
+        dpi=200,
+        bbox_inches="tight",
+    )
+
     plt.close(fig)
+
     return path
 
 
-def _categorical_scatter(
+def _add_mean_std(
+        ax: plt.Axes,
+        x: float,
+        values: pd.Series,
+) -> None:
+    """Add mean ± standard deviation to an existing plot."""
+    mean = values.mean()
+    std = values.std(ddof=1)
+
+    ax.errorbar(
+        x,
+        mean,
+        yerr=std,
+        fmt="D",
+        markersize=7,
+        capsize=5,
+        linewidth=1.5,
+        zorder=4,
+    )
+
+    ax.annotate(
+        f"{mean:.3f}",
+        (x, mean),
+        xytext=(0, 9),
+        textcoords="offset points",
+        ha="center",
+        fontsize=9,
+    )
+
+
+def _categorical_summary_plot(
         df: pd.DataFrame,
         category: str,
         value: str,
@@ -44,26 +89,48 @@ def _categorical_scatter(
         title: str,
         filename: str,
         output_dir: Path = FIGURES_DIR,
+        ylim: tuple[float, float] | None = None,
 ) -> Path:
-    """Create a scatter plot for a categorical independent variable."""
+    """Plot individual runs plus mean ± standard deviation.
+
+    Small horizontal jitter prevents overlapping observations from hiding
+    repeated values.
+    """
     categories = list(dict.fromkeys(df[category].tolist()))
+
     positions = {
         item: i
         for i, item in enumerate(categories)
     }
 
-    fig, ax = plt.subplots(figsize=(7, 5))
+    rng = np.random.default_rng(JITTER_SEED)
 
-    x = [
-        positions[item]
-        for item in df[category]
-    ]
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
 
-    ax.scatter(
-        x,
-        df[value],
-        alpha=0.75,
-    )
+    for category_value in categories:
+        group = df[df[category] == category_value]
+
+        x_center = positions[category_value]
+
+        jitter = rng.uniform(
+            -0.12,
+            0.12,
+            size=len(group),
+        )
+
+        ax.scatter(
+            np.full(len(group), x_center) + jitter,
+            group[value],
+            alpha=0.55,
+            s=35,
+            zorder=2,
+        )
+
+        _add_mean_std(
+            ax,
+            x_center,
+            group[value],
+        )
 
     ax.set_xticks(
         range(len(categories)),
@@ -74,6 +141,16 @@ def _categorical_scatter(
     ax.set_ylabel(ylabel)
     ax.set_title(title)
 
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    ax.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    ax.set_axisbelow(True)
+
     return _save(
         fig,
         filename,
@@ -81,7 +158,7 @@ def _categorical_scatter(
     )
 
 
-def _numeric_scatter(
+def _numeric_summary_plot(
         df: pd.DataFrame,
         x_column: str,
         y_column: str,
@@ -90,19 +167,53 @@ def _numeric_scatter(
         title: str,
         filename: str,
         output_dir: Path = FIGURES_DIR,
+        ylim: tuple[float, float] | None = None,
 ) -> Path:
-    """Create a scatter plot for two numeric variables."""
-    fig, ax = plt.subplots(figsize=(7, 5))
+    """Plot individual runs plus mean ± standard deviation by numeric x."""
+    x_values = sorted(df[x_column].unique())
 
-    ax.scatter(
-        df[x_column],
-        df[y_column],
-        alpha=0.75,
-    )
+    rng = np.random.default_rng(JITTER_SEED)
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
+    for x_value in x_values:
+        group = df[df[x_column] == x_value]
+
+        jitter = rng.uniform(
+            -0.10,
+            0.10,
+            size=len(group),
+        )
+
+        ax.scatter(
+            np.full(len(group), x_value) + jitter,
+            group[y_column],
+            alpha=0.55,
+            s=35,
+            zorder=2,
+        )
+
+        _add_mean_std(
+            ax,
+            x_value,
+            group[y_column],
+        )
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
+
+    ax.set_xticks(x_values)
+
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    ax.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    ax.set_axisbelow(True)
 
     return _save(
         fig,
@@ -116,16 +227,40 @@ def plot_baseline(
         output_dir: Path = FIGURES_DIR,
 ) -> Path:
     """Plot baseline retransmission overhead across runs."""
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
 
-    ax.plot(
-        df.index,
+    x = np.arange(1, len(df) + 1)
+
+    ax.scatter(
+        x,
         df["retransmission_overhead"],
+        alpha=0.65,
+        s=35,
+    )
+
+    mean = df["retransmission_overhead"].mean()
+
+    ax.axhline(
+        mean,
+        linestyle="--",
+        linewidth=1.5,
+        label=f"Mean = {mean:.3f}",
     )
 
     ax.set_xlabel("Run")
     ax.set_ylabel("Retransmission overhead")
-    ax.set_title("Baseline retransmission overhead")
+    ax.set_title("Baseline: retransmission overhead")
+
+    ax.set_ylim(bottom=0)
+
+    ax.legend()
+
+    ax.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    ax.set_axisbelow(True)
 
     return _save(
         fig,
@@ -138,9 +273,10 @@ def plot_rq1(
         df: pd.DataFrame,
         output_dir: Path = FIGURES_DIR,
 ) -> list[Path]:
-    """Create RQ1 exploratory plots."""
+    """Create RQ1 descriptive plots."""
+
     return [
-        _categorical_scatter(
+        _categorical_summary_plot(
             df,
             "traffic_level",
             "affected_cb_count",
@@ -150,7 +286,8 @@ def plot_rq1(
             "rq1_affected_cbs.png",
             output_dir,
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
             df,
             "traffic_level",
             "affected_cbg_count",
@@ -160,7 +297,19 @@ def plot_rq1(
             "rq1_affected_cbgs.png",
             output_dir,
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
+            df,
+            "traffic_level",
+            "failed_cbg_count",
+            "URLLC traffic level",
+            "Failed CBG count",
+            "RQ1: failed CBGs by URLLC traffic",
+            "rq1_failed_cbgs.png",
+            output_dir,
+        ),
+
+        _categorical_summary_plot(
             df,
             "traffic_level",
             "retransmission_overhead",
@@ -169,8 +318,10 @@ def plot_rq1(
             "RQ1: retransmission overhead by URLLC traffic",
             "rq1_retransmission_overhead.png",
             output_dir,
+            ylim=(0, 1.05),
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
             df,
             "traffic_level",
             "embb_delivery_efficiency",
@@ -179,6 +330,7 @@ def plot_rq1(
             "RQ1: eMBB delivery efficiency by URLLC traffic",
             "rq1_embb_delivery_efficiency.png",
             output_dir,
+            ylim=(0, 1.05),
         ),
     ]
 
@@ -187,9 +339,10 @@ def plot_rq2(
         df: pd.DataFrame,
         output_dir: Path = FIGURES_DIR,
 ) -> list[Path]:
-    """Create RQ2 exploratory plots."""
+    """Create RQ2 descriptive plots."""
+
     return [
-        _categorical_scatter(
+        _categorical_summary_plot(
             df,
             "preemption_pattern",
             "affected_cb_count",
@@ -199,17 +352,19 @@ def plot_rq2(
             "rq2_affected_cbs.png",
             output_dir,
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
             df,
             "preemption_pattern",
-            "affected_cbg_count",
+            "failed_cbg_count",
             "Preemption pattern",
-            "Affected CBG count",
-            "RQ2: affected CBGs by preemption pattern",
-            "rq2_affected_cbgs.png",
+            "Failed CBG count",
+            "RQ2: failed CBGs by preemption pattern",
+            "rq2_failed_cbgs.png",
             output_dir,
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
             df,
             "preemption_pattern",
             "retransmission_overhead",
@@ -218,8 +373,10 @@ def plot_rq2(
             "RQ2: retransmission overhead by preemption pattern",
             "rq2_retransmission_overhead.png",
             output_dir,
+            ylim=(0, 0.55),
         ),
-        _categorical_scatter(
+
+        _categorical_summary_plot(
             df,
             "preemption_pattern",
             "embb_delivery_efficiency",
@@ -228,6 +385,7 @@ def plot_rq2(
             "RQ2: eMBB delivery efficiency by preemption pattern",
             "rq2_embb_delivery_efficiency.png",
             output_dir,
+            ylim=(0.6, 1.05),
         ),
     ]
 
@@ -236,80 +394,154 @@ def plot_rq3(
         df: pd.DataFrame,
         output_dir: Path = FIGURES_DIR,
 ) -> list[Path]:
-    """Create RQ3 exploratory plots."""
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True,
+    """Create RQ3 descriptive plots.
+
+    RQ3 focuses on how CBG configuration affects CBG failures and the
+    resulting retransmission consequences. Affected-CB and affected-CBG
+    plots are intentionally omitted because they are invariant or largely
+    determined by the fixed preemption realization in this experiment.
+    """
+
+    return [
+        _numeric_summary_plot(
+            df,
+            "cbg_count",
+            "failed_cbg_count",
+            "Number of CBGs",
+            "Failed CBG count",
+            "RQ3: failed CBGs by CBG configuration",
+            "rq3_failed_cbgs.png",
+            output_dir,
+            ylim=(-0.15, 4.25),
+        ),
+
+        _numeric_summary_plot(
+            df,
+            "cbg_count",
+            "retransmission_overhead",
+            "Number of CBGs",
+            "Retransmission overhead",
+            "RQ3: retransmission overhead by CBG configuration",
+            "rq3_retransmission_overhead.png",
+            output_dir,
+            ylim=(0, 0.55),
+        ),
+
+        _numeric_summary_plot(
+            df,
+            "cbg_count",
+            "embb_delivery_efficiency",
+            "Number of CBGs",
+            "eMBB delivery efficiency",
+            "RQ3: eMBB delivery efficiency by CBG configuration",
+            "rq3_embb_delivery_efficiency.png",
+            output_dir,
+            ylim=(0.6, 1.05),
+        ),
+    ]
+
+def plot_rq2_failure_occurrence_rate(
+        df: pd.DataFrame,
+        output_dir: Path = FIGURES_DIR,
+) -> Path:
+    """Plot the proportion of runs with at least one failed CBG."""
+
+    categories = list(dict.fromkeys(df["preemption_pattern"].tolist()))
+
+    failure_rates = [
+        (df.loc[df["preemption_pattern"] == category, "failed_cbg_count"] > 0).mean()
+        for category in categories
+    ]
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
+    bars = ax.bar(
+        categories,
+        failure_rates,
+        alpha=0.75,
     )
 
-    paths: list[Path] = []
-
-    # CB exposure is expected to be identical across CBG configurations
-    # for a given seed in the current paired design, but the observations
-    # are plotted directly rather than encoding an expected result.
-    for value, ylabel, filename, title in [
-        (
-            "affected_cb_count",
-            "Affected CB count",
-            "rq3_affected_cbs.png",
-            "RQ3: affected code blocks by CBG configuration",
-        ),
-        (
-            "affected_cbg_count",
-            "Affected CBG count",
-            "rq3_affected_cbgs.png",
-            "RQ3: affected CBGs by CBG configuration",
-        ),
-        (
-            "retransmission_overhead",
-            "Retransmission overhead",
-            "rq3_retransmission_overhead.png",
-            "RQ3: retransmission overhead by CBG configuration",
-        ),
-        (
-            "embb_delivery_efficiency",
-            "eMBB delivery efficiency",
-            "rq3_embb_delivery_efficiency.png",
-            "RQ3: eMBB delivery efficiency by CBG configuration",
-        ),
-    ]:
-        fig, ax = plt.subplots(figsize=(7, 5))
-
-        for seed, group in df.groupby(
-                "seed",
-                sort=True,
-        ):
-            group = group.sort_values("cbg_count")
-
-            ax.plot(
-                group["cbg_count"],
-                group[value],
-                alpha=0.25,
-            )
-
-        ax.scatter(
-            df["cbg_count"],
-            df[value],
-            alpha=0.75,
+    for bar, rate in zip(bars, failure_rates):
+        ax.annotate(
+            f"{rate:.1%}",
+            (bar.get_x() + bar.get_width() / 2, rate),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            fontsize=9,
         )
 
-        ax.set_xlabel("Number of CBGs")
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
+    ax.set_xlabel("Preemption pattern")
+    ax.set_ylabel("Runs with at least one failed CBG")
+    ax.set_title("RQ2: failure occurrence rate by preemption pattern")
+    ax.set_ylim(0, 1.05)
 
-        paths.append(
-            _save(
-                fig,
-                filename,
-                output_dir,
-            )
+    ax.grid(
+        axis="y",
+        alpha=0.25,
+    )
+
+    ax.set_axisbelow(True)
+
+    return _save(
+        fig,
+        "rq2_failure_occurrence_rate.png",
+        output_dir,
+    )
+
+
+def plot_rq2_overhead_ecdf(
+        df: pd.DataFrame,
+        output_dir: Path = FIGURES_DIR,
+) -> Path:
+    """Plot the empirical cumulative distribution of retransmission overhead."""
+
+    categories = list(dict.fromkeys(df["preemption_pattern"].tolist()))
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
+    for category in categories:
+        values = np.sort(
+            df.loc[
+                df["preemption_pattern"] == category,
+                "retransmission_overhead",
+            ].to_numpy()
         )
 
-    return paths
+        cumulative = np.arange(1, len(values) + 1) / len(values)
 
+        ax.step(
+            values,
+            cumulative,
+            where="post",
+            linewidth=2,
+            label=category,
+        )
+
+    ax.set_xlabel("Retransmission overhead")
+    ax.set_ylabel("Cumulative proportion of runs")
+    ax.set_title("RQ2: empirical distribution of retransmission overhead")
+    ax.set_xlim(left=0)
+    ax.set_ylim(0, 1.05)
+
+    ax.legend(title="Preemption pattern")
+
+    ax.grid(
+        axis="both",
+        alpha=0.25,
+    )
+
+    ax.set_axisbelow(True)
+
+    return _save(
+        fig,
+        "rq2_retransmission_overhead_ecdf.png",
+        output_dir,
+    )
 
 def main() -> None:
-    """Generate all exploratory figures from the raw CSV files."""
+    """Generate all descriptive figures from the raw CSV files."""
+
     paths: list[Path] = []
 
     paths.append(
@@ -335,6 +567,21 @@ def main() -> None:
             load_results(RQ3_FILE)
         )
     )
+    rq2_df = load_results(RQ2_FILE)
+
+    paths.append(
+        plot_rq2_failure_occurrence_rate(
+            rq2_df
+        )
+    )
+
+    paths.append(
+        plot_rq2_overhead_ecdf(
+            rq2_df
+        )
+    )
+
+    print("Generated figures:")
 
     print("Generated figures:")
 

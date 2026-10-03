@@ -22,7 +22,7 @@ from config.simulation import MEDIUM_URLLC_ARRIVAL_RATE, make_default_config
 from src.simulation import run_simulation
 
 CBG_COUNTS = (2, 4, 8)
-PREEMPTION_FRACTION = 0.10
+PREEMPTION_FRACTION = 0.20
 
 CSV_COLUMNS = (
     "run",

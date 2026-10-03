@@ -1,4 +1,4 @@
 preemption_pattern,n,mean_preempted_positions,std_preempted_positions,mean_preemption_fraction,mean_affected_cb_count,std_affected_cb_count,mean_affected_cbg_count,std_affected_cbg_count,mean_failed_cbg_count,mean_retransmission_positions,mean_retransmission_overhead,std_retransmission_overhead,mean_embb_delivery_efficiency,std_embb_delivery_efficiency,runs_with_failure
-concentrated,30,29.0,0.0,0.1006944444444444,2.0,0.0,2.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0
-distributed,30,29.0,0.0,0.1006944444444444,8.0,0.0,4.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0
-random,30,29.0,0.0,0.1006944444444444,7.9,0.3051285766293648,4.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0
+concentrated,30,58.0,0.0,0.2013888888888889,2.0,0.0,2.0,0.0,2.0,144.0,0.5,0.0,0.6666666666666666,0.0,30
+distributed,30,58.0,0.0,0.2013888888888889,8.0,0.0,4.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0
+random,30,58.0,0.0,0.2013888888888889,8.0,0.0,4.0,0.0,0.5333333333333333,38.4,0.13333333333333333,0.1572025562074641,0.8977777777777778,0.11577932945474789,14
