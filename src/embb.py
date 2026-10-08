@@ -23,6 +23,11 @@ from typing import Dict, Iterable, List, Literal, Optional, Tuple
 #   "time_first":      symbol index varies fastest, then subcarrier.
 MappingOrder = Literal["frequency_first", "time_first"]
 
+# Abstract CB-to-grid allocation modes (not NR rate matching/interleaving):
+#   "contiguous": each CB occupies one consecutive range of linear positions.
+#   "interleaved": positions are assigned round-robin across CBs.
+MappingMode = Literal["contiguous", "interleaved"]
+
 
 @dataclass(frozen=True, order=True)
 class ResourcePosition:
@@ -41,6 +46,7 @@ class EmbbConfig:
     num_symbols: int = 14
     num_subcarriers: int = 24
     mapping_order: MappingOrder = "frequency_first"
+    mapping_mode: MappingMode = "contiguous"
 
     def __post_init__(self) -> None:
         for name in ("num_code_blocks", "coded_positions_per_cb",
@@ -49,6 +55,8 @@ class EmbbConfig:
                 raise ValueError(f"{name} must be a positive integer")
         if self.mapping_order not in ("frequency_first", "time_first"):
             raise ValueError(f"Unknown mapping_order: {self.mapping_order!r}")
+        if self.mapping_mode not in ("contiguous", "interleaved"):
+            raise ValueError(f"Unknown mapping_mode: {self.mapping_mode!r}")
         if self.total_coded_positions > self.grid_size:
             raise ValueError(
                 f"TB needs {self.total_coded_positions} positions but the "
@@ -122,17 +130,33 @@ class TransportBlock:
     # ---- construction -------------------------------------------------
     @classmethod
     def from_config(cls, config: EmbbConfig) -> "TransportBlock":
-        """Build the TB: CB i gets linear indices [i*N, (i+1)*N)."""
+        """Build the TB using the configured abstract CB allocation mode.
+
+        ``contiguous`` assigns CB *i* the consecutive linear positions
+        ``[i*N, (i+1)*N)``. ``interleaved`` assigns positions round-robin
+        across CBs, so CB *i* receives linear indices
+        ``i, i+C, i+2C, ...`` where C is the number of CBs.
+
+        The interleaved mode is intentionally a simple experimental abstraction;
+        it does not claim to implement 3GPP NR bit interleaving or rate matching.
+        """
         n = config.coded_positions_per_cb
+        c = config.num_code_blocks
+
+        def positions_for_cb(cb_id: int) -> Tuple[ResourcePosition, ...]:
+            if config.mapping_mode == "contiguous":
+                indices = range(cb_id * n, (cb_id + 1) * n)
+            else:
+                indices = (cb_id + j * c for j in range(n))
+            return tuple(config.index_to_position(k) for k in indices)
+
         cbs = tuple(
             CodeBlock(
                 cb_id=i,
                 num_coded_positions=n,
-                positions=tuple(
-                    config.index_to_position(k) for k in range(i * n, (i + 1) * n)
-                ),
+                positions=positions_for_cb(i),
             )
-            for i in range(config.num_code_blocks)
+            for i in range(c)
         )
         return cls(config=config, code_blocks=cbs)
 
@@ -162,12 +186,14 @@ class TransportBlock:
 if __name__ == "__main__":
     cfg = EmbbConfig(num_code_blocks=8, coded_positions_per_cb=36,
                      num_symbols=14, num_subcarriers=24,
-                     mapping_order="frequency_first")
+                     mapping_order="frequency_first",
+                     mapping_mode="contiguous")
     tb = TransportBlock.from_config(cfg)
 
     print(f"eMBB TB: {tb.num_code_blocks} CBs, "
           f"{cfg.total_coded_positions}/{cfg.grid_size} grid positions used, "
-          f"abstract order={cfg.mapping_order}\n")
+          f"abstract order={cfg.mapping_order}, "
+         f"CB allocation={cfg.mapping_mode}\n")
 
     for cb in tb.code_blocks:
         symbols = sorted({p.symbol for p in cb.positions})

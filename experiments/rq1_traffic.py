@@ -1,10 +1,11 @@
 """RQ1: effect of URLLC traffic intensity on eMBB damage and CBG retransmission.
 
 Only ``arrival_rate`` varies (low / medium / high). Everything else is fixed:
-default eMBB config, CBG count 4, "random" preemption pattern, decoder
-threshold 0.25. With ``preemption_fraction`` and ``num_preempt`` both None, the
-preempted amount is derived from the generated URLLC demand, so the preempted
-fraction is an outcome of the traffic level, not a fixed parameter.
+default eMBB config, CBG count 4, "random" preemption pattern, and the
+SNR-aware decoder at the study operating point (10 dB). With
+``preemption_fraction`` and ``num_preempt`` both None, the preempted amount
+is derived from the generated URLLC demand, so the preempted fraction is an
+outcome of the traffic level, not a fixed parameter.
 
 Experiment driver only (no statistics or plotting).
 Run from the project root:  python -m experiments.rq1_traffic

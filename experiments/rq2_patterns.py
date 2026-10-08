@@ -1,9 +1,10 @@
 """RQ2: effect of the spatial pattern of URLLC preemption on eMBB damage.
 
 Only ``preemption_pattern`` varies (concentrated / distributed / random).
-Fixed: medium URLLC arrival rate, CBG count 4, preemption_fraction 0.10,
-num_preempt None, decoder threshold 0.25. Every pattern therefore preempts the
-SAME number of eMBB positions; only their spatial distribution differs.
+Fixed: medium URLLC arrival rate, CBG count 4, preemption_fraction 0.20,
+num_preempt None, and the SNR-aware decoder at the study operating point
+(10 dB). Every pattern therefore preempts the SAME number of eMBB positions;
+only their spatial distribution differs.
 
 Experiment driver only (no statistics or plotting).
 Run from the project root:  python -m experiments.rq2_patterns

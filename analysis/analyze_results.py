@@ -3,6 +3,7 @@
 This module reads the raw experiment CSV files and produces descriptive
 summaries only. It deliberately does not perform hypothesis tests or make
 claims about statistical significance.
+analysis/analyze_results.py
 """
 
 from __future__ import annotations

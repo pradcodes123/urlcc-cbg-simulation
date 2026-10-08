@@ -24,7 +24,7 @@ class SimulationConfig:
     """All parameters of one simulation trial."""
 
     embb_config: EmbbConfig
-    cbg_count: int                          # N, max CBGs (TS 38.214 §5.1.7.1)
+    cbg_count: int                          # Configured number of CBGs in the abstraction
     urllc_config: URLLCConfig
     preemption_pattern: str = "random"
     preemption_fraction: float | None = None
@@ -56,7 +56,8 @@ def run_simulation(config: SimulationConfig, seed: int | None = None) -> Simulat
 
     cb_ids = tb.affected_cb_ids(preemption.preempted_positions)
     cbg_ids = affected_cbg_ids(cbgs, cb_ids)
-    decoded = decode_cbgs(tb, cbgs, preemption.preempted_positions, config.decoder_config)
+    decoded = decode_cbgs(tb, cbgs, preemption.preempted_positions, config.decoder_config,
+                          seed=seed)
     requests = create_retransmission_requests(decoded, cbgs, tb)
 
     return calculate_metrics(

@@ -193,7 +193,7 @@ class TestMetrics(unittest.TestCase):
             tb,
             cbgs,
             hit,
-            DecoderConfig(0.25),
+            DecoderConfig(failure_threshold=0.25, model="threshold"),
         )
 
         reqs = create_retransmission_requests(

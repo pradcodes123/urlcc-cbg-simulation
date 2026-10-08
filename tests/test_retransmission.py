@@ -84,7 +84,7 @@ class TestRetransmission(unittest.TestCase):
     def test_chain_from_decoder(self):
         # Preempt all positions of CBG0 (CBs 0-2): only CBG0 fails.
         hit = [p for cb in self.cbgs[0].cb_ids for p in self.tb.get_cb(cb).positions]
-        decoded = decode_cbgs(self.tb, self.cbgs, hit, DecoderConfig(0.25))
+        decoded = decode_cbgs(self.tb, self.cbgs, hit, DecoderConfig(failure_threshold=0.25, model="threshold"))
         reqs = self.make(decoded)
         self.assertEqual(reqs, (RetransmissionRequest(0, 12),))
         self.assertAlmostEqual(retransmission_overhead(reqs, self.total), 0.3)

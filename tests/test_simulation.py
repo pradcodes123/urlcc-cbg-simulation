@@ -82,7 +82,7 @@ class TestSimulation(unittest.TestCase):
 
     def test_full_chain_matches_manual_pipeline(self):
         cfg = make_config(preemption_pattern="concentrated", preemption_fraction=None,
-                          decoder_config=DecoderConfig(0.25))
+                          decoder_config=DecoderConfig(failure_threshold=0.25, model="threshold"))
         seed = 11
         # URLLC -> preemption -> affected CBs -> affected CBGs -> decoder -> retx.
         tb = TransportBlock.from_config(cfg.embb_config)

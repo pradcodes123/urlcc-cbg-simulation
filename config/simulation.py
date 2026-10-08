@@ -18,6 +18,7 @@ DEFAULT_CODED_POSITIONS_PER_CB = 36
 # CBG grouping and decoding
 DEFAULT_CBG_COUNT = 4
 DEFAULT_FAILURE_THRESHOLD = 0.25
+DEFAULT_DECODER_SNR_DB = 10.0
 
 # URLLC traffic (simulation scenarios, not standardized traffic classes)
 DEFAULT_URLLC_DEMAND_MIN = 2
@@ -61,9 +62,13 @@ def make_default_config(
         preemption_pattern=preemption_pattern,
         preemption_fraction=preemption_fraction,
         num_preempt=num_preempt,
-        decoder_config=DecoderConfig(failure_threshold=DEFAULT_FAILURE_THRESHOLD),
+        decoder_config=DecoderConfig(
+            failure_threshold=DEFAULT_FAILURE_THRESHOLD,
+            model="snr",
+            snr_db=DEFAULT_DECODER_SNR_DB,
+        ),
     )
 
 
 if __name__ == "__main__":
-    print(make_default_config())   # configuration only; no simulation is run
+    print(make_default_config())  # configuration only; no simulation is run

@@ -24,8 +24,6 @@ from experiments.rq3_cbg import (  # noqa: E402
 expected_count = round(288 * PREEMPTION_FRACTION)
 expected_fraction = expected_count / 288
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 class TestRq3(unittest.TestCase):
 
     @classmethod

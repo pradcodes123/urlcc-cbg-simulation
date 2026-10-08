@@ -1,8 +1,9 @@
 """RQ3: effect of the configured number of CBGs on eMBB damage and retransmission.
 
 Only ``cbg_count`` varies (2 / 4 / 8). Fixed: medium URLLC arrival rate,
-"random" preemption pattern, preemption_fraction 0.10, num_preempt None,
-decoder threshold 0.25, default eMBB config (8 code blocks).
+"random" preemption pattern, preemption_fraction 0.20, num_preempt None,
+SNR-aware decoder at the study operating point (10 dB), and default eMBB
+configuration (8 code blocks).
 
 Because the random preemption depends only on the seed, run ``i`` preempts the
 very same positions under every CBG configuration; only the CB-to-CBG grouping
