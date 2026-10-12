@@ -1,9 +1,16 @@
-"""CBG-level retransmission requests after controlled decoding (abstraction).
 
-NOT a HARQ implementation: no timing, ACK/NACK signaling, scheduling, resource
-allocation, channel model or second decoding pass. This module only decides
-which CBGs need retransmission and how many coded positions that represents.
+"""Abstract CBG-level retransmission accounting.
+
+This module creates one retransmission request for each failed CBG and charges
+the full mapped resource-position count of that CBG.
+
+This is a full-CBG retransmission-cost abstraction, NOT a standards-compliant
+NR HARQ implementation. It does not model retransmission timing, ACK/NACK,
+resource allocation, rate matching, redundancy versions, soft combining, or a
+second decoding pass. The resulting overhead is measured in mapped logical
+resource positions, not actual NR resource elements or transmitted bits.
 """
+
 
 from __future__ import annotations
 
@@ -20,7 +27,7 @@ class RetransmissionRequest:
     """Request to retransmit one CBG."""
 
     cbg_id: int
-    num_positions: int   # mapped positions of all CBs in the CBG
+    num_positions: int   # abstract mapped-position cost of retransmitting this CBG
 
 
 def get_failed_cbgs(decoding_results: Iterable[CBGDecodingResult]) -> tuple[int, ...]:

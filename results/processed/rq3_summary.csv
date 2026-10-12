@@ -1,4 +1,4 @@
-cbg_count,n,mean_preempted_positions,std_preempted_positions,mean_preemption_fraction,mean_affected_cb_count,std_affected_cb_count,mean_affected_cbg_count,std_affected_cbg_count,mean_failed_cbg_count,mean_retransmission_positions,mean_retransmission_overhead,std_retransmission_overhead,mean_embb_delivery_efficiency,std_embb_delivery_efficiency,runs_with_failure
-2,30,58.0,0.0,0.2013888888888889,8.0,0.0,2.0,0.0,0.03333333333333333,4.8,0.016666666666666666,0.09128709291752768,0.9888888888888889,0.06085806194501847,1
-4,30,58.0,0.0,0.2013888888888889,8.0,0.0,4.0,0.0,0.1,7.2,0.025,0.07628214415734116,0.98,0.061025715325872934,3
-8,30,58.0,0.0,0.2013888888888889,8.0,0.0,8.0,0.0,0.4666666666666667,16.8,0.058333333333333334,0.07860127810373206,0.9496296296296296,0.06626528809576003,12
+cbg_count,n,mean_preempted_positions,std_preempted_positions,mean_preemption_fraction,mean_affected_cb_count,std_affected_cb_count,mean_affected_cbg_count,std_affected_cbg_count,mean_failed_cbg_count,std_failed_cbg_count,mean_retransmission_positions,mean_retransmission_overhead,std_retransmission_overhead,mean_embb_delivery_efficiency,std_embb_delivery_efficiency,runs_with_failure,failure_run_fraction
+2,30,58.0,0.0,0.2013888888888889,8.0,0.0,2.0,0.0,0.16666666666666666,0.461133037377414,91.2,0.31666666666666665,0.5330998051949096,0.8466666666666666,0.23070772340744633,4,0.13333333333333333
+4,30,58.0,0.0,0.2013888888888889,8.0,0.0,4.0,0.0,0.43333333333333335,0.6260623155792926,96.0,0.3333333333333333,0.36158972114370397,0.7979365079365078,0.19057338789914777,11,0.36666666666666664
+8,30,58.0,0.0,0.2013888888888889,8.0,0.0,8.0,0.0,0.9,0.7119666788018509,93.6,0.325,0.19028109877684682,0.7706708106708107,0.11652463480756396,21,0.7

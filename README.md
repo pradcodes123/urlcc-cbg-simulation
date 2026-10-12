@@ -14,7 +14,7 @@ code-block-group (CBG) retransmissions in 5G NR-inspired systems.
 
 ## Project Structure
 
-```text
+
 urlcc-cbg-simulation/
 ├── config/          # Simulation configuration
 ├── src/             # Core simulation modules

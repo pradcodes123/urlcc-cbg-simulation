@@ -1,86 +1,141 @@
-"""Standalone decoder operating-point sensitivity pilot.
 
-This script does not modify official RQ1/RQ2/RQ3 experiments or results.
-It uses the existing eMBB/CBG/preemption abstractions and the stochastic
-SNR-aware decoder to identify a non-saturated operating regime.
+"""RQ2 decoder-SNR sensitivity experiment.
+
+Keeps the original RQ2 traffic, CBG configuration, puncturing fraction,
+patterns and seeds fixed. Only decoder SNR changes.
+
+Writes to results/decoder_sensitivity/; never overwrites official results.
+Run from the repository root:
+    python -m experiments.decoder_sensitivity
 """
+
 from __future__ import annotations
 
 import csv
-import sys
+import dataclasses
 from pathlib import Path
-import numpy as np
 
-ROOT = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT))
+from config.simulation import MEDIUM_URLLC_ARRIVAL_RATE, make_default_config
+from src.simulation import run_simulation
 
-from src.embb import EmbbConfig, TransportBlock
-from src.cbg import group_code_blocks
-from src.decoder import DecoderConfig, decode_cbgs
-from src.preemption import generate_preemption
-
-TOTAL = 288
 PATTERNS = ("concentrated", "distributed", "random")
-SNR_VALUES = (8.0, 10.0, 12.0)
-FRACTIONS = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30)
-CBG_COUNTS = (2, 4, 8)
-N_RUNS = 30
+SNR_VALUES_DB = (6.0, 10.0, 14.0)
+NUM_RUNS = 200
+BASE_SEED = 0
+PREEMPTION_FRACTION = 0.20
+
+OUTPUT_DIR = Path("results/decoder_sensitivity")
+RAW_PATH = OUTPUT_DIR / "raw" / "rq2_decoder_sensitivity.csv"
+SUMMARY_PATH = OUTPUT_DIR / "processed" / "rq2_decoder_sensitivity_summary.csv"
+
+METRICS = (
+    "preempted_positions",
+    "preemption_fraction",
+    "affected_cb_count",
+    "affected_cbg_count",
+    "failed_cbg_count",
+    "retransmission_positions",
+    "retransmission_overhead",
+    "embb_delivery_efficiency",
+)
 
 
-def run_trial(pattern: str, fraction: float, snr_db: float, cbg_count: int, seed: int):
-    tb = TransportBlock.from_config(EmbbConfig())
-    cbgs = group_code_blocks(tb, cbg_count)
-    pre = generate_preemption(tb, [], pattern, preemption_fraction=fraction, seed=seed)
-    decoded = decode_cbgs(tb, cbgs, pre.preempted_positions,
-                          DecoderConfig(snr_db=snr_db), seed=seed)
-    failed_ids = {r.cbg_id for r in decoded if not r.success}
-    retx_positions = sum(
-        sum(len(tb.get_cb(cb_id).positions) for cb_id in cbg.cb_ids)
-        for cbg in cbgs if cbg.cbg_id in failed_ids
-    )
-    return len(failed_ids), retx_positions / TOTAL
+def run_experiment() -> list[dict]:
+    rows: list[dict] = []
+
+    for snr_db in SNR_VALUES_DB:
+        for pattern in PATTERNS:
+            config = make_default_config(
+                arrival_rate=MEDIUM_URLLC_ARRIVAL_RATE,
+                cbg_count=4,
+                preemption_pattern=pattern,
+                preemption_fraction=PREEMPTION_FRACTION,
+                num_preempt=None,
+            )
+            config = dataclasses.replace(
+                config,
+                channel_config=dataclasses.replace(
+                    config.channel_config,
+                    mean_snr_db=snr_db,
+                ),
+            )
+
+            for run in range(NUM_RUNS):
+                seed = BASE_SEED + run
+                metrics = run_simulation(config, seed=seed)
+                rows.append({
+                    "snr_db": snr_db,
+                    "preemption_pattern": pattern,
+                    "run": run,
+                    "seed": seed,
+                    **dataclasses.asdict(metrics),
+                })
+
+    return rows
+
+
+def summarize(rows: list[dict]) -> list[dict]:
+    summary: list[dict] = []
+
+    for snr_db in SNR_VALUES_DB:
+        for pattern in PATTERNS:
+            group = [
+                row for row in rows
+                if row["snr_db"] == snr_db
+                and row["preemption_pattern"] == pattern
+            ]
+
+            record = {
+                "snr_db": snr_db,
+                "preemption_pattern": pattern,
+                "n": len(group),
+                "runs_with_failure": sum(
+                    row["failed_cbg_count"] > 0 for row in group
+                ),
+            }
+
+            for metric in METRICS:
+                values = [float(row[metric]) for row in group]
+                record[f"mean_{metric}"] = (
+                    sum(values) / len(values) if values else float("nan")
+                )
+
+            summary.append(record)
+
+    return summary
+
+
+def write_csv(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        raise ValueError(f"No rows to write to {path}")
+
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main() -> None:
-    rows = []
-    for snr in SNR_VALUES:
-        for fraction in FRACTIONS:
-            for pattern in PATTERNS:
-                values = [run_trial(pattern, fraction, snr, 4, seed)
-                          for seed in range(N_RUNS)]
-                rows.append({
-                    "snr_db": snr,
-                    "preemption_fraction": fraction,
-                    "pattern": pattern,
-                    "cbg_count": 4,
-                    "runs": N_RUNS,
-                    "mean_failed_cbg": np.mean([v[0] for v in values]),
-                    "failure_occurrence_rate": np.mean([v[0] > 0 for v in values]),
-                    "mean_retransmission_overhead": np.mean([v[1] for v in values]),
-                })
+    rows = run_experiment()
+    summary = summarize(rows)
 
-    # RQ3 sensitivity at the existing 10% preemption fraction.
-    for snr in SNR_VALUES:
-        for cbg_count in CBG_COUNTS:
-            values = [run_trial("random", 0.10, snr, cbg_count, seed)
-                      for seed in range(N_RUNS)]
-            rows.append({
-                "snr_db": snr,
-                "preemption_fraction": 0.10,
-                "pattern": "random",
-                "cbg_count": cbg_count,
-                "runs": N_RUNS,
-                "mean_failed_cbg": np.mean([v[0] for v in values]),
-                "failure_occurrence_rate": np.mean([v[0] > 0 for v in values]),
-                "mean_retransmission_overhead": np.mean([v[1] for v in values]),
-            })
+    write_csv(RAW_PATH, rows)
+    write_csv(SUMMARY_PATH, summary)
 
-    out = ROOT / "sensitivity_pilot.csv"
-    with out.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-        writer.writeheader()
-        writer.writerows(rows)
-    print(f"Wrote {out}")
+    print(f"Runs: {len(rows)} (expected {len(SNR_VALUES_DB) * len(PATTERNS) * NUM_RUNS})")
+    print(f"Summary groups: {len(summary)}")
+    print(f"Raw results: {RAW_PATH}")
+    print(f"Summary: {SUMMARY_PATH}")
+    print("\nMean retransmission overhead by SNR and pattern:")
+
+    for row in summary:
+        print(
+            f"SNR={row['snr_db']:>4.1f} dB | "
+            f"{row['preemption_pattern']:<12} | "
+            f"overhead={row['mean_retransmission_overhead']:.4f} | "
+            f"runs with failure={row['runs_with_failure']}/{row['n']}"
+        )
 
 
 if __name__ == "__main__":

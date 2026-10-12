@@ -11,6 +11,14 @@ from src.embb import EmbbConfig
 from src.simulation import SimulationConfig
 from src.urllc import URLLCConfig
 
+# Logical time-frequency resource allocation
+DEFAULT_NUM_SYMBOLS = 14
+DEFAULT_NUM_SUBCARRIERS = 48  # 4 PRBs × 12 subcarriers
+DEFAULT_MAPPING_ORDER = "frequency_first"
+DEFAULT_MAPPING_MODE = "contiguous"
+DEFAULT_MODULATION_ORDER = 2  # QPSK: 2 bits per modulation symbol
+DEFAULT_RESERVED_PATTERN = "first_symbol"
+
 # eMBB transport block
 DEFAULT_NUM_CODE_BLOCKS = 8
 DEFAULT_CODED_POSITIONS_PER_CB = 36
@@ -50,6 +58,12 @@ def make_default_config(
         embb_config=EmbbConfig(
             num_code_blocks=DEFAULT_NUM_CODE_BLOCKS,
             coded_positions_per_cb=DEFAULT_CODED_POSITIONS_PER_CB,
+            num_symbols=DEFAULT_NUM_SYMBOLS,
+            num_subcarriers=DEFAULT_NUM_SUBCARRIERS,
+            mapping_order=DEFAULT_MAPPING_ORDER,
+            mapping_mode=DEFAULT_MAPPING_MODE,
+            modulation_order=DEFAULT_MODULATION_ORDER,
+            reserved_pattern=DEFAULT_RESERVED_PATTERN,
         ),
         cbg_count=cbg_count,
         urllc_config=URLLCConfig(

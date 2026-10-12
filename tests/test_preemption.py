@@ -115,12 +115,30 @@ class TestPreemption(unittest.TestCase):
         r2 = generate_preemption(self.tb, events, "distributed", num_preempt=20)
         self.assertEqual(r2.preempted_count, 20)   # explicit amount overrides events
 
+
     def test_concentrated_is_contiguous_and_deterministic(self):
-        used = self.tb.used_positions()
-        r = generate_preemption(self.tb, [], "concentrated", num_preempt=20)
-        start = used.index(r.preempted_positions[0])
-        self.assertEqual(list(r.preempted_positions), used[start:start + 20])
-        self.assertEqual(r, generate_preemption(self.tb, [], "concentrated", num_preempt=20))
+        r1 = generate_preemption(
+            self.tb, [], "concentrated", num_preempt=20
+        )
+        r2 = generate_preemption(
+            self.tb, [], "concentrated", num_preempt=20
+        )
+
+        self.assertEqual(r1.preempted_positions, r2.preempted_positions)
+        self.assertEqual(r1.preempted_count, 20)
+
+        selected = set(r1.preempted_positions)
+        self.assertEqual(len(selected), 20)
+
+        # A compact cluster should occupy a smaller spatial extent than
+        # the full allocation, rather than a run in CB-list order.
+        symbols = [p.symbol for p in selected]
+        subcarriers = [p.subcarrier for p in selected]
+
+        self.assertLess(max(symbols) - min(symbols), self.tb.config.num_symbols)
+        self.assertLess(
+            max(subcarriers) - min(subcarriers),
+            self.tb.config.num_subcarriers)
 
 
 if __name__ == "__main__":

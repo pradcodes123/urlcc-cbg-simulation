@@ -26,7 +26,7 @@ class URLLCEvent:
 
     event_id: int
     arrival_time: int       # slot in which the event arrives
-    resource_demand: int    # abstract resource units requested
+    resource_demand: int     # requested abstract eligible-RE units
     deadline: int           # absolute slot: arrival_time + relative deadline
 
 

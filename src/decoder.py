@@ -168,7 +168,9 @@ class SnrLinkModel:
     def evaluate(self, damage_ratio: float) -> tuple[float, Optional[float]]:
         eff_db = self.effective_snr_db(damage_ratio)
         margin = eff_db - self.required_snr_db
-        p_fail = 0.5 * math.erfc(margin / (self.sigma_db * math.sqrt(2.0)))
+        p_fail = 0.5 * math.erfc(
+            margin / (self.sigma_db * math.sqrt(2.0))
+        )
         return min(1.0, max(0.0, p_fail)), eff_db
 
 
@@ -190,6 +192,7 @@ def decode_cbgs(transport_block: TransportBlock,
                 seed: Optional[int] = None,
                 rng: Optional[np.random.Generator] = None,
                 model: Optional[DecodingModel] = None,
+                snr_db_by_cbg: Optional[dict[int, float]] = None,
                 ) -> tuple[CBGDecodingResult, ...]:
     """Decide success/failure of each CBG from its damage ratio.
 
@@ -211,6 +214,7 @@ def decode_cbgs(transport_block: TransportBlock,
             without seed/rng, or a CBG with no mapped positions.
     """
     config = config or DecoderConfig()
+    custom_model_supplied = model is not None
     model = model or make_model(config)
 
     if seed is not None and rng is not None:
@@ -234,7 +238,19 @@ def decode_cbgs(transport_block: TransportBlock,
         hits = sum(len(cb.position_set & preempted) for cb in cb_list)
         ratio = hits / total
 
-        p_fail, eff_db = model.evaluate(ratio)
+        cbg_model = model
+
+        if snr_db_by_cbg is not None and config.model == "snr":
+            if not custom_model_supplied:
+                cbg_snr = snr_db_by_cbg.get(cbg.cbg_id, config.snr_db)
+                cbg_model = SnrLinkModel(
+                    snr_db=cbg_snr,
+                    spectral_efficiency=config.spectral_efficiency,
+                    gap_db=config.gap_db,
+                    sigma_db=config.sigma_db,
+                )
+
+        p_fail, eff_db = cbg_model.evaluate(ratio)
         # u in [0, 1): p = 1 always fails and p = 0 never fails, so the legacy
         # deterministic rule (p in {0, 1}) is reproduced exactly without randomness.
         u = rng.random() if model.stochastic else 0.5
