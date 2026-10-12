@@ -82,7 +82,7 @@ class TestSimulation(unittest.TestCase):
 
     def test_full_chain_matches_manual_pipeline(self):
         cfg = make_config(preemption_pattern="concentrated", preemption_fraction=None,
-                          decoder_config=DecoderConfig(failure_threshold=0.25, model="threshold"))
+                          decoder_config=DecoderConfig(model="snr"))
         seed = 11
         # URLLC -> preemption -> affected CBs -> affected CBGs -> decoder -> retx.
         tb = TransportBlock.from_config(cfg.embb_config)
@@ -91,7 +91,13 @@ class TestSimulation(unittest.TestCase):
         pre = generate_preemption(tb, events, "concentrated", seed=seed)
         cb_ids = tb.affected_cb_ids(pre.preempted_positions)
         cbg_ids = affected_cbg_ids(cbgs, cb_ids)
-        decoded = decode_cbgs(tb, cbgs, pre.preempted_positions, cfg.decoder_config)
+        decoded = decode_cbgs(
+            tb,
+            cbgs,
+            pre.preempted_positions,
+            cfg.decoder_config,
+            seed=seed,
+        )
         reqs = create_retransmission_requests(decoded, cbgs, tb)
 
         m = run_simulation(cfg, seed=seed)

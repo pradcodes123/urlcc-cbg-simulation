@@ -89,6 +89,82 @@ class TestRetransmission(unittest.TestCase):
         self.assertEqual(reqs, (RetransmissionRequest(0, 12),))
         self.assertAlmostEqual(retransmission_overhead(reqs, self.total), 0.3)
 
+    
+    def test_resource_cost_equals_full_cbg_size(self):
+        from src.cbg import group_code_blocks
+        from src.decoder import CBGDecodingResult
+        from src.embb import EmbbConfig, TransportBlock
+        from src.retransmission import create_retransmission_requests
+
+        tb = TransportBlock.from_config(
+            EmbbConfig(num_code_blocks=4, coded_positions_per_cb=4)
+        )
+        cbgs = group_code_blocks(tb, max_cbgs=2)
+
+        decoding_results = [
+            CBGDecodingResult(
+                cbg_id=0,
+                total_positions=8,
+                hit_positions=1,
+                damage_ratio=1 / 8,
+                success=False,
+                failure_probability=1.0,
+                effective_snr_db=0.0,
+            )
+        ]
+
+        requests = create_retransmission_requests(
+            decoding_results, cbgs, tb
+        )
+
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(
+            requests[0].resource_cost,
+            requests[0].num_positions,
+        )
+
+
+    def test_total_retransmission_cost_is_sum_of_requests(self):
+        from src.cbg import group_code_blocks
+        from src.decoder import CBGDecodingResult
+        from src.embb import EmbbConfig, TransportBlock
+        from src.retransmission import create_retransmission_requests
+
+        tb = TransportBlock.from_config(
+            EmbbConfig(num_code_blocks=4, coded_positions_per_cb=4)
+        )
+        cbgs = group_code_blocks(tb, max_cbgs=2)
+
+        decoding_results = [
+            CBGDecodingResult(
+                cbg_id=0,
+                total_positions=8,
+                hit_positions=1,
+                damage_ratio=1 / 8,
+                success=False,
+                failure_probability=1.0,
+                effective_snr_db=0.0,
+            ),
+            CBGDecodingResult(
+                cbg_id=1,
+                total_positions=8,
+                hit_positions=1,
+                damage_ratio=1 / 8,
+                success=False,
+                failure_probability=1.0,
+                effective_snr_db=0.0,
+            ),
+        ]
+
+        requests = create_retransmission_requests(
+            decoding_results, cbgs, tb
+        )
+
+        self.assertEqual(
+            sum(r.resource_cost for r in requests),
+            sum(r.num_positions for r in requests),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,11 +21,14 @@ from config.simulation import (HIGH_URLLC_ARRIVAL_RATE, LOW_URLLC_ARRIVAL_RATE,
                                MEDIUM_URLLC_ARRIVAL_RATE, make_default_config)
 from src.simulation import run_simulation
 
+
 TRAFFIC_LEVELS = (
+    ("no_preemption", MEDIUM_URLLC_ARRIVAL_RATE),
     ("low", LOW_URLLC_ARRIVAL_RATE),
     ("medium", MEDIUM_URLLC_ARRIVAL_RATE),
     ("high", HIGH_URLLC_ARRIVAL_RATE),
 )
+
 
 CSV_COLUMNS = (
     "run",
@@ -41,6 +44,14 @@ CSV_COLUMNS = (
     "retransmission_positions",
     "retransmission_overhead",
     "embb_delivery_efficiency",
+    "initial_failed_cbg_count",
+    "harq_recovered_cbg_count",
+    "initial_cbg_failure_rate",
+    "residual_bler",
+    "final_delivery_success_rate",
+    "harq_retransmission_count",
+    "delivered_embb_positions",
+    "embb_delivery_rate_per_slot",
 )
 
 DEFAULT_OUTPUT_PATH = "results/raw/rq1_traffic.csv"
@@ -57,10 +68,25 @@ def run_rq1(num_runs: int = 30, base_seed: int = 0) -> list[dict]:
         raise ValueError(f"base_seed must be a non-negative integer, got {base_seed!r}")
 
     rows: list[dict] = []
+    
     for level, rate in TRAFFIC_LEVELS:
-        config = make_default_config(arrival_rate=rate, cbg_count=4,
-                                     preemption_pattern="random",
-                                     preemption_fraction=None, num_preempt=None)
+        if level == "no_preemption":
+            config = make_default_config(
+                arrival_rate=rate,
+                cbg_count=4,
+                preemption_pattern="random",
+                preemption_fraction=0.0,
+                num_preempt=None,
+            )
+        else:
+            config = make_default_config(
+                arrival_rate=rate,
+                cbg_count=4,
+                preemption_pattern="random",
+                preemption_fraction=None,
+                num_preempt=None,
+            )
+
         for run in range(num_runs):
             seed = base_seed + run
             metrics = run_simulation(config, seed=seed)

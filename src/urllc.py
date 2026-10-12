@@ -67,38 +67,113 @@ def preset_config(level: TrafficLevel, simulation_time: int = 100) -> URLLCConfi
                        simulation_time=simulation_time)
 
 
-def generate_urllc_traffic(config: URLLCConfig, seed: int) -> Tuple[URLLCEvent, ...]:
-    """Generate URLLC events for one run, sorted by arrival time.
 
-    Args:
-        config: traffic parameters.
-        seed: integer seed for ``np.random.default_rng``; same seed and config
-            always give identical events.
+def generate_urllc_traffic(
+        config: URLLCConfig,
+        seed: int,
+        arrival_pattern: str | None = None,
+    ) -> Tuple[URLLCEvent, ...]:
+        """Generate reproducible URLLC traffic.
 
-    Returns:
-        Tuple of URLLCEvent with ids 0..n-1 in arrival order (possibly empty).
-    """
-    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
-        raise ValueError(f"seed must be a non-negative integer, got {seed!r}")
-    rng = np.random.default_rng(seed)
+        With arrival_pattern=None, preserve the original Poisson process.
 
-    # Poisson process: cumulative exponential inter-arrival times, then floor to slots.
-    slots = []
-    t = 0.0
-    while True:
-        t += rng.exponential(1.0 / config.arrival_rate)
-        if t >= config.simulation_time:
-            break
-        slots.append(int(t))
+        Explicit patterns use the same fixed event count and event demands:
+        - poisson: random times, conditional on the fixed event count
+        - evenly_spaced: arrivals spread uniformly over the observation window
+        - bursty: arrivals grouped around two burst centres
+        """
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError(f"seed must be a non-negative integer, got {seed!r}")
 
-    demands = rng.integers(config.min_resource_demand,
-                           config.max_resource_demand + 1, size=len(slots))
+        if arrival_pattern is None:
+            rng = np.random.default_rng(seed)
+            slots = []
+            t = 0.0
 
-    return tuple(
-        URLLCEvent(event_id=i, arrival_time=slot, resource_demand=int(d),
-                   deadline=slot + config.deadline)
-        for i, (slot, d) in enumerate(zip(slots, demands))
-    )
+            while True:
+                t += rng.exponential(1.0 / config.arrival_rate)
+                if t >= config.simulation_time:
+                    break
+                slots.append(int(t))
+
+            demands = rng.integers(
+                config.min_resource_demand,
+                config.max_resource_demand + 1,
+                size=len(slots),
+            )
+
+            return tuple(
+                URLLCEvent(
+                    event_id=i,
+                    arrival_time=slot,
+                    resource_demand=int(demand),
+                    deadline=slot + config.deadline,
+                )
+                for i, (slot, demand) in enumerate(zip(slots, demands))
+            )
+
+        supported = {"poisson", "evenly_spaced", "bursty"}
+        if arrival_pattern not in supported:
+            raise ValueError(
+                f"Unknown arrival_pattern {arrival_pattern!r}; "
+                f"expected one of {sorted(supported)}"
+            )
+
+        # Explicit patterns have identical event counts across conditions.
+        count = int(round(config.arrival_rate * config.simulation_time))
+
+        if count == 0:
+            return ()
+
+        # Independent streams keep event demands matched across patterns.
+        time_rng = np.random.default_rng([seed, 0x41525249])
+        demand_rng = np.random.default_rng([seed, 0x44454D41])
+
+        duration = config.simulation_time
+
+        if arrival_pattern == "poisson":
+            # Conditional Poisson arrival times: uniform over the window
+            # given the fixed number of arrivals.
+            times = np.floor(
+                time_rng.uniform(0, duration, size=count)
+            ).astype(int)
+
+        elif arrival_pattern == "evenly_spaced":
+            times = np.floor(
+                (np.arange(count) + 0.5) * duration / count
+            ).astype(int)
+            times = np.clip(times, 0, duration - 1)
+
+        else:  # bursty
+            # Assign events as evenly as possible to two burst centres,
+            # then add small random timing jitter.
+            burst_count = min(2, count)
+            burst_ids = np.arange(count) % burst_count
+            centres = (burst_ids + 0.5) * duration / burst_count
+            jitter = time_rng.normal(loc=0.0, scale=0.75, size=count)
+            times = np.floor(centres + jitter).astype(int)
+            times = np.clip(times, 0, duration - 1)
+
+        demands = demand_rng.integers(
+            config.min_resource_demand,
+            config.max_resource_demand + 1,
+            size=count,
+        )
+
+        # Keep event IDs tied to matched demands, not arrival order.
+        events = [
+            URLLCEvent(
+                event_id=i,
+                arrival_time=int(times[i]),
+                resource_demand=int(demands[i]),
+                deadline=int(times[i]) + config.deadline,
+            )
+            for i in range(count)
+        ]
+
+        return tuple(sorted(events, key=lambda event: (
+            event.arrival_time, event.event_id
+        )))
 
 
 if __name__ == "__main__":

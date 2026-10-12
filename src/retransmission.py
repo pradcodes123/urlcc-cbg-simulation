@@ -27,7 +27,12 @@ class RetransmissionRequest:
     """Request to retransmit one CBG."""
 
     cbg_id: int
-    num_positions: int   # abstract mapped-position cost of retransmitting this CBG
+    num_positions: int  # Abstract mapped-position cost
+
+    @property
+    def resource_cost(self) -> int:
+        """Full-CBG retransmission cost in mapped logical positions."""
+        return self.num_positions
 
 
 def get_failed_cbgs(decoding_results: Iterable[CBGDecodingResult]) -> tuple[int, ...]:

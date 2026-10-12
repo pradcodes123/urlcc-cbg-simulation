@@ -30,6 +30,7 @@ class SimulationConfig:
     num_preempt: int | None = None
     decoder_config: DecoderConfig = DecoderConfig()
     scheduler_slot_capacity: int = 16
+    urllc_arrival_pattern: str | None = None
 
     channel_config: ChannelConfig = ChannelConfig(
         mean_snr_db=10.0,
@@ -68,7 +69,11 @@ def run_simulation(
 
     tb = TransportBlock.from_config(config.embb_config)
     cbgs = group_code_blocks(tb, config.cbg_count)
-    events = generate_urllc_traffic(config.urllc_config, seed)
+    events = generate_urllc_traffic(
+        config.urllc_config,
+        seed,
+        arrival_pattern=config.urllc_arrival_pattern,
+    )
 
     # Schedule URLLC events subject to per-slot capacity and deadlines.
     scheduler_config = SchedulerConfig(
@@ -131,6 +136,12 @@ def run_simulation(
         seed=seed,
         snr_db_by_cbg=snr_by_cbg,
     )
+    initial_decoded = tuple(decoded)
+    if config.decoder_config.model != "snr":
+        raise ValueError(
+            "HARQ recovery experiments currently require "
+            "the stochastic SNR decoder (model='snr')."
+        )
 
     # Simulate retry outcomes using each CBG's initial failure probability.
     # Retries are independent Bernoulli trials with the same probability;
@@ -138,8 +149,9 @@ def run_simulation(
     retry_rng = np.random.default_rng([seed, 0x48415251])
     final_decoded = []
     requests = []
+    harq_retransmission_count = 0
 
-    for result in decoded:
+    for result in initial_decoded:
         cbg = next(g for g in cbgs if g.cbg_id == result.cbg_id)
         cbg_positions = sum(
             len(tb.get_cb(cb_id).positions)
@@ -171,6 +183,7 @@ def run_simulation(
 
         # Charge only retransmission attempts after the initial transmission.
         retry_count = max(0, len(harq_result.attempts) - 1)
+        harq_retransmission_count += retry_count
         if retry_count:
             requests.append(
                 RetransmissionRequest(
@@ -179,13 +192,15 @@ def run_simulation(
                 )
             )
 
-    decoded = tuple(final_decoded)
-
+    
     return calculate_metrics(
         total_embb_positions=preemption.total_embb_positions,
         preempted_positions=preemption.preempted_count,
         affected_cb_ids=cb_ids,
         affected_cbg_ids=cbg_ids,
-        decoding_results=decoded,
+        initial_decoding_results=initial_decoded,
+        final_decoding_results=tuple(final_decoded),
         retransmission_requests=requests,
+        harq_retransmission_count=harq_retransmission_count,
+        simulation_time_slots=config.urllc_config.simulation_time,
     )

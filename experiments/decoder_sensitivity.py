@@ -28,15 +28,24 @@ OUTPUT_DIR = Path("results/decoder_sensitivity")
 RAW_PATH = OUTPUT_DIR / "raw" / "rq2_decoder_sensitivity.csv"
 SUMMARY_PATH = OUTPUT_DIR / "processed" / "rq2_decoder_sensitivity_summary.csv"
 
+
 METRICS = (
     "preempted_positions",
     "preemption_fraction",
     "affected_cb_count",
     "affected_cbg_count",
+    "initial_failed_cbg_count",
+    "harq_recovered_cbg_count",
     "failed_cbg_count",
+    "initial_cbg_failure_rate",
+    "residual_bler",
+    "final_delivery_success_rate",
     "retransmission_positions",
+    "harq_retransmission_count",
     "retransmission_overhead",
     "embb_delivery_efficiency",
+    "delivered_embb_positions",
+    "embb_delivery_rate_per_slot",
 )
 
 
@@ -128,14 +137,22 @@ def main() -> None:
     print(f"Raw results: {RAW_PATH}")
     print(f"Summary: {SUMMARY_PATH}")
     print("\nMean retransmission overhead by SNR and pattern:")
+     
+    print("\nSensitivity results by SNR and preemption pattern:")
 
     for row in summary:
         print(
             f"SNR={row['snr_db']:>4.1f} dB | "
             f"{row['preemption_pattern']:<12} | "
             f"overhead={row['mean_retransmission_overhead']:.4f} | "
-            f"runs with failure={row['runs_with_failure']}/{row['n']}"
+            f"residual BLER={row['mean_residual_bler']:.4f} | "
+            f"delivery rate="
+            f"{row['mean_embb_delivery_rate_per_slot']:.4f} "
+            f"positions/slot | "
+            f"final success="
+            f"{row['mean_final_delivery_success_rate']:.4f}"
         )
+   
 
 
 if __name__ == "__main__":

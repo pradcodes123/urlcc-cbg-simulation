@@ -41,7 +41,7 @@ from experiments.realism_v2 import (
 ROOT = Path(__file__).resolve().parents[1]
 
 RAW_DIR = ROOT / "results" / "raw"
-
+RESULTS_DIR = RAW_DIR
 PROCESSED_DIR = ROOT / "results" / "processed"
 
 SENSITIVITY_FILE = (
@@ -90,6 +90,12 @@ METRIC_COLUMNS = (
 
 )
 
+# Optional metrics: older CSVs and unit-test fixtures may not contain these.
+DELIVERY_METRIC_COLUMNS = (
+    "delivered_embb_positions",
+    "embb_delivery_rate_per_slot",
+)
+
 def require_file(path: Path) -> None:
 
     """Raise a useful error when an expected input file is absent."""
@@ -107,6 +113,14 @@ def load_raw(filename: str) -> pd.DataFrame:
     require_file(path)
 
     return pd.read_csv(path)
+
+
+def load_results(filename: str) -> pd.DataFrame:
+    """Load an experiment CSV from the results directory."""
+    path = RESULTS_DIR / filename
+    require_file(path)
+    return pd.read_csv(path)
+
 
 def validate_columns(df: pd.DataFrame, required: Iterable[str], label: str) -> None:
 
@@ -164,7 +178,10 @@ def normalise_columns(df: pd.DataFrame, label: str) -> pd.DataFrame:
 
     )
 
-    unknown = set(result["preemption_pattern"]) - set(PATTERNS)
+    # RQ2 now includes an explicit no-preemption control row. It is valid raw
+    # data, although it is intentionally excluded from pairwise pattern tests.
+    allowed_conditions = set(PATTERNS) | {"no_preemption"}
+    unknown = set(result["preemption_pattern"]) - allowed_conditions
 
     if unknown:
 
@@ -232,6 +249,12 @@ def descriptive_summary(
 
     ).reset_index()
 
+    # Add the new delivery metrics only when the input dataset contains them.
+    for column in DELIVERY_METRIC_COLUMNS:
+        if column in df.columns:
+            summary[f"mean_{column}"] = grouped[column].mean().to_numpy()
+            summary[f"std_{column}"] = grouped[column].std().fillna(0.0).to_numpy()
+
     failure_counts = grouped["failed_cbg_count"].apply(lambda values: int((values > 0).sum()))
 
     summary["runs_with_failure"] = summary[group_column].map(failure_counts)
@@ -240,29 +263,81 @@ def descriptive_summary(
 
     return summary
 
+
 def baseline_summary(df: pd.DataFrame) -> pd.DataFrame:
-
     """Summarise the no-preemption baseline as a single row."""
+    required = [
+        column for column in METRIC_COLUMNS
+        if column != "preemption_fraction"
+    ]
+    validate_columns(df, required, "Baseline")
 
-    validate_columns(df, METRIC_COLUMNS, "Baseline")
+    data = df.copy()
+    if "preemption_fraction" not in data.columns:
+        data["preemption_fraction"] = 0.0
 
-    row: dict[str, float | int] = {"n": len(df)}
+    row: dict[str, float | int] = {"n": len(data)}
 
     for column in METRIC_COLUMNS:
+        row[f"mean_{column}"] = float(data[column].mean())
 
-        row[f"mean_{column}"] = float(df[column].mean())
+        if column in {
+            "preempted_positions",
+            "affected_cb_count",
+            "affected_cbg_count",
+            "failed_cbg_count",
+            "retransmission_overhead",
+            "embb_delivery_efficiency",
+        }:
+            row[f"std_{column}"] = (
+                float(data[column].std()) if len(data) > 1 else 0.0
+            )
 
-        if column in {"preempted_positions", "affected_cb_count", "affected_cbg_count",
+    # Preserve backward compatibility with baseline CSVs lacking delivery metrics.
+    for column in DELIVERY_METRIC_COLUMNS:
+        if column in data.columns:
+            row[f"mean_{column}"] = float(data[column].mean())
+            row[f"std_{column}"] = (
+                float(data[column].std()) if len(data) > 1 else 0.0
+            )
 
-                         "failed_cbg_count", "retransmission_overhead",
-
-                         "embb_delivery_efficiency"}:
-
-            row[f"std_{column}"] = float(df[column].std()) if len(df) > 1 else 0.0
-
-    row["runs_with_failure"] = int((df["failed_cbg_count"] > 0).sum())
-
+    row["runs_with_failure"] = int(
+        (data["failed_cbg_count"] > 0).sum()
+    )
     return pd.DataFrame([row])
+
+
+
+def analyze_baseline(df: pd.DataFrame) -> pd.DataFrame:
+    """Compatibility wrapper for baseline analysis."""
+    return baseline_summary(df)
+
+
+def analyze_rq1(df: pd.DataFrame) -> pd.DataFrame:
+    """Summarise RQ1 by traffic level."""
+    return descriptive_summary(df, "traffic_level", "RQ1")
+
+
+def analyze_rq2(df: pd.DataFrame) -> pd.DataFrame:
+    """Summarise RQ2 by preemption pattern."""
+    return descriptive_summary(df, "preemption_pattern", "RQ2")
+
+
+def analyze_rq3(df: pd.DataFrame) -> pd.DataFrame:
+    """Summarise RQ3 by CBG count."""
+    return descriptive_summary(df, "cbg_count", "RQ3")
+
+
+def _write_summary(
+    summary: pd.DataFrame,
+    filename: str,
+) -> Path:
+    """Write a summary CSV into the processed-results directory."""
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    path = PROCESSED_DIR / filename
+    summary.to_csv(path, index=False)
+    return path
+
 
 def validate_pairing(df: pd.DataFrame, group_columns: list[str]) -> None:
 
@@ -433,6 +508,22 @@ def make_bootstrap_summary(
             row["mean_delivery_efficiency"] = float(
 
                 pd.to_numeric(group["embb_delivery_efficiency"], errors="raise").mean()
+
+            )
+
+        if "delivered_embb_positions" in group.columns:
+
+            row["mean_delivered_embb_positions"] = float(
+
+                pd.to_numeric(group["delivered_embb_positions"], errors="raise").mean()
+
+            )
+
+        if "embb_delivery_rate_per_slot" in group.columns:
+
+            row["mean_embb_delivery_rate_per_slot"] = float(
+
+                pd.to_numeric(group["embb_delivery_rate_per_slot"], errors="raise").mean()
 
             )
 
@@ -921,7 +1012,9 @@ def write_report(
 
         "The SNR sweep contains only the configured operating points. The decoder is not calibrated against measured or standard-derived NR BLER curves. "
 
-        "Bootstrap intervals quantify simulation run-to-run uncertainty, not model misspecification. Retransmission overhead is a model metric, not a complete throughput or latency measurement.", "",
+        "Bootstrap intervals quantify simulation run-to-run uncertainty, not model misspecification. Retransmission overhead is a model metric, not a complete throughput or latency measurement. ",
+
+        "The eMBB delivery-rate metric is successfully delivered logical eMBB positions per configured simulation slot. It is a model-level proxy, not physical throughput in bits/s or Mbps, because the simulator does not model a complete shared eMBB transmission timeline.", "",
 
         f"Bootstrap replicates: {BOOTSTRAP_REPLICATES}",
 
