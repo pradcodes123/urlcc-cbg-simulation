@@ -639,6 +639,10 @@ def main() -> None:
         )
     )
 
+    # Supplementary figures use the actual logical allocation and RQ2 pipeline.
+    paths.append(plot_rq2_resource_grid_patterns())
+    paths.append(plot_rq2_preemption_cbg_chain_example())
+
     print("Generated figures:")
 
     for path in paths:
@@ -646,3 +650,15 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def plot_rq2_resource_grid_patterns(output_dir: Path = FIGURES_DIR) -> Path:
+    """Create the supplementary logical-grid comparison for RQ2."""
+    from analysis.grid_views import plot_rq2_resource_grid_patterns as _plot
+    return _plot(output_dir)
+
+
+def plot_rq2_preemption_cbg_chain_example(output_dir: Path = FIGURES_DIR) -> Path:
+    """Create a deterministic illustrative preemption-to-CBG outcome figure."""
+    from analysis.grid_views import plot_rq2_preemption_cbg_chain_example as _plot
+    return _plot(output_dir)
