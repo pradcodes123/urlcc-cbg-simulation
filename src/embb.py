@@ -24,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Literal, Optional, Tuple
 
+
 MappingOrder = Literal["frequency_first", "time_first"]
 MappingMode = Literal["contiguous", "interleaved"]
 ReservedPattern = Literal["none", "first_symbol"]

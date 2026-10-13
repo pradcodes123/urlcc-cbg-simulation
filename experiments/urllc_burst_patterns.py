@@ -15,11 +15,13 @@ from config.simulation import MEDIUM_URLLC_ARRIVAL_RATE, make_default_config
 from src.scheduler import SchedulerConfig, schedule_urllc_events
 from src.simulation import run_simulation
 from src.urllc import generate_urllc_traffic
+from src.embb import TransportBlock
+from src.preemption import generate_preemption
 
 ARRIVAL_PATTERNS = ("poisson", "evenly_spaced", "bursty")
 NUM_RUNS = 200
 BASE_SEED = 0
-PREEMPTION_FRACTION = 0.20
+# Preemption count is derived from successfully scheduled URLLC demand.
 
 OUTPUT_DIR = Path("results/urllc_burst_patterns")
 RAW_PATH = OUTPUT_DIR / "raw" / "urllc_burst_patterns.csv"
@@ -33,6 +35,65 @@ SCHEDULER_METRICS = (
 )
 
 
+def slot_to_symbol(slot: int, simulation_time: int, num_symbols: int) -> int:
+    """Map a scheduler slot to an eMBB symbol deterministically."""
+    if simulation_time <= 0 or num_symbols <= 0:
+        raise ValueError("simulation_time and num_symbols must be positive")
+    if not 0 <= slot < simulation_time:
+        raise ValueError(f"slot {slot} is outside the simulation")
+    return min(slot * num_symbols // simulation_time, num_symbols - 1)
+
+
+
+def select_time_aware_preemption(
+    config,
+    events,
+    scheduling,
+    seed: int,
+):
+    """Select eligible eMBB positions in symbols mapped from successful URLLC slots."""
+    tb = TransportBlock.from_config(config.embb_config)
+    successful_ids = {
+        result.event_id for result in scheduling if result.success
+    }
+    successful_events = [
+        event for event in events if event.event_id in successful_ids
+    ]
+
+    num_symbols = config.embb_config.num_symbols
+    simulation_time = config.urllc_config.simulation_time
+
+    eligible = tb.used_positions()
+    selected = set()
+
+    for event in successful_events:
+        symbol = slot_to_symbol(
+            event.arrival_time, simulation_time, num_symbols
+        )
+        candidates = [
+            position for position in eligible
+            if position.symbol == symbol and position not in selected
+        ]
+
+        demand = min(event.resource_demand, len(candidates))
+        if demand:
+            # Use a deterministic random subset within the mapped symbol.
+            candidates.sort(
+                key=lambda position: (
+                    (position.symbol * 73856093)
+                    ^ (position.subcarrier * 19349663)
+                    ^ (seed * 83492791)
+                    ^ (event.event_id * 2654435761)
+                )
+            )
+            selected.update(candidates[:demand])
+
+    return tuple(sorted(
+        selected,
+        key=lambda position: (position.symbol, position.subcarrier),
+    ))
+
+
 def run_experiment() -> list[dict]:
     rows: list[dict] = []
 
@@ -44,7 +105,7 @@ def run_experiment() -> list[dict]:
                 arrival_rate=MEDIUM_URLLC_ARRIVAL_RATE,
                 cbg_count=4,
                 preemption_pattern="random",
-                preemption_fraction=PREEMPTION_FRACTION,
+                preemption_fraction=None,
                 num_preempt=None,
             )
             config = dataclasses.replace(
@@ -77,7 +138,13 @@ def run_experiment() -> list[dict]:
                 for result in scheduling
             )
 
-            metrics = run_simulation(config, seed=seed)
+            preemption_positions = select_time_aware_preemption(
+                    config, events, scheduling, seed
+            )
+            metrics = run_simulation(
+                    config, seed=seed, events=events,
+                    preemption_positions=preemption_positions,
+            )
 
             rows.append({
                 "arrival_pattern": pattern,

@@ -1,5 +1,5 @@
 contrast,snr_low_db,snr_high_db,n_paired_seeds,difference_at_low_snr,difference_at_high_snr,interaction_change,bootstrap_ci95_low,bootstrap_ci95_high,ci_excludes_zero
 concentrated - distributed,6.0,10.0,200,0.0,-0.0125,-0.0125,-0.03875,0.01375,False
 concentrated - distributed,10.0,14.0,200,-0.0125,-0.00125,0.01125,-0.00625,0.02875,False
-concentrated - random,6.0,10.0,200,0.0025,-0.0125,-0.015,-0.0575,0.02875,False
+concentrated - random,6.0,10.0,200,0.0025,-0.0125,-0.015,-0.05625,0.02875,False
 concentrated - random,10.0,14.0,200,-0.0125,-0.0025,0.01,-0.01375,0.035,False

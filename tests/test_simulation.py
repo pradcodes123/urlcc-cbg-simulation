@@ -124,6 +124,25 @@ class TestSimulation(unittest.TestCase):
     def test_seed_none_runs(self):
         self.assertIsInstance(run_simulation(make_config(), seed=None), SimulationMetrics)
 
+    
+    def test_explicit_preemption_positions_are_used(self):
+        from src.embb import ResourcePosition
+
+        positions = (
+            ResourcePosition(symbol=2, subcarrier=3),
+            ResourcePosition(symbol=2, subcarrier=4),
+        )
+        config = make_config(preemption_fraction=None, num_preempt=None)
+
+        metrics = run_simulation(
+            config,
+            seed=1,
+            preemption_positions=positions,
+        )
+
+        self.assertEqual(metrics.preempted_positions, 2)
+    
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,7 @@
 snr_db,pattern_a,pattern_b,contrast,n_pairs,mean_difference,ci95_low,ci95_high,p_value,p_holm,significant_holm_0_05
 6.0,concentrated,distributed,concentrated - distributed,200,0.0,-0.01875,0.02,0.8028850291124622,1.0,False
 6.0,concentrated,random,concentrated - random,200,0.0025,-0.02875,0.03375,0.9030605054232796,1.0,False
-6.0,distributed,random,distributed - random,200,0.0025,-0.02875,0.0325,0.9519055362923782,1.0,False
+6.0,distributed,random,distributed - random,200,0.0025,-0.0275,0.0325,0.9519055362923782,1.0,False
 10.0,concentrated,distributed,concentrated - distributed,200,-0.0125,-0.03,0.005,0.13484263778578554,0.4045279133573566,False
 10.0,concentrated,random,concentrated - random,200,-0.0125,-0.0375,0.01125,0.2835439265139722,0.5670878530279444,False
 10.0,distributed,random,distributed - random,200,0.0,-0.0225,0.0225,1.0,1.0,False

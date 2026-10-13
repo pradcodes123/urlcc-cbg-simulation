@@ -277,7 +277,7 @@ def plot_rq1_preemption_vs_overhead(
     """
 
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
-    markers = ("o", "s", "^")
+    markers = ("o", "s", "^", "d")
     categories = list(dict.fromkeys(df["traffic_level"].tolist()))
 
     for marker, category in zip(markers, categories):
@@ -648,9 +648,6 @@ def main() -> None:
     for path in paths:
         print(f"  {path}")
 
-if __name__ == "__main__":
-    main()
-
 
 def plot_rq2_resource_grid_patterns(output_dir: Path = FIGURES_DIR) -> Path:
     """Create the supplementary logical-grid comparison for RQ2."""
@@ -662,3 +659,8 @@ def plot_rq2_preemption_cbg_chain_example(output_dir: Path = FIGURES_DIR) -> Pat
     """Create a deterministic illustrative preemption-to-CBG outcome figure."""
     from analysis.grid_views import plot_rq2_preemption_cbg_chain_example as _plot
     return _plot(output_dir)
+
+
+if __name__ == "__main__":
+    main()
+

@@ -1,4 +1,4 @@
 arrival_pattern,n,mean_event_count,mean_scheduling_success_rate,mean_deadline_miss_rate,mean_capacity_rejection_rate,mean_scheduled_resource_units,mean_preempted_positions,mean_affected_cbg_count,mean_initial_failed_cbg_count,mean_harq_recovered_cbg_count,mean_failed_cbg_count,mean_retransmission_positions,mean_retransmission_overhead,mean_residual_bler,mean_final_delivery_success_rate,mean_delivered_embb_positions,mean_embb_delivery_rate_per_slot,mean_embb_delivery_efficiency
-poisson,200,4.0,1.0,0.0,0.0,19.585,58.0,4.0,0.715,0.425,0.29,81.36,0.2825,0.0725,0.9275,267.12,13.356000000000002,0.8249761904761905
-evenly_spaced,200,4.0,1.0,0.0,0.0,19.585,58.0,4.0,0.715,0.425,0.29,81.36,0.2825,0.0725,0.9275,267.12,13.356000000000002,0.8249761904761905
-bursty,200,4.0,1.0,0.0,0.0,19.585,58.0,4.0,0.715,0.425,0.29,81.36,0.2825,0.0725,0.9275,267.12,13.356000000000002,0.8249761904761905
+poisson,200,4.0,1.0,0.0,0.0,19.585,7.805,1.39,0.185,0.145,0.04,10.44,0.03625,0.01,0.99,285.12,14.256000000000002,0.9758333333333333
+evenly_spaced,200,4.0,1.0,0.0,0.0,19.585,9.75,2.0,0.18,0.15,0.03,9.36,0.0325,0.0075,0.9925,285.84,14.292,0.977
+bursty,200,4.0,1.0,0.0,0.0,19.585,9.735,1.56,0.17,0.13,0.04,11.52,0.04,0.01,0.99,285.12,14.256000000000002,0.9716666666666667

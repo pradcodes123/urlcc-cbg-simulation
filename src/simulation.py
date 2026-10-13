@@ -8,15 +8,16 @@ import numpy as np
 
 from src.cbg import affected_cbg_ids, group_code_blocks
 from src.decoder import DecoderConfig, decode_cbgs
-from src.embb import EmbbConfig, TransportBlock
+from src.embb import EmbbConfig, TransportBlock, ResourcePosition
 from src.metrics import SimulationMetrics, calculate_metrics
-from src.preemption import generate_preemption
+from src.preemption import generate_preemption, PreemptionResult
 from src.scheduler import SchedulerConfig, schedule_urllc_events
 from src.urllc import URLLCConfig, generate_urllc_traffic
 
 from src.channel import ChannelConfig, generate_channel_samples
 from src.harq import HARQConfig, simulate_harq
 from src.retransmission import RetransmissionRequest
+
 
 @dataclass(frozen=True)
 class SimulationConfig:
@@ -61,6 +62,8 @@ class SimulationConfig:
 def run_simulation(
     config: SimulationConfig,
     seed: int | None = None,
+    events: tuple | None = None,
+    preemption_positions: tuple | None = None,
 ) -> SimulationMetrics:
     """Run one reproducible simulation trial."""
 
@@ -69,11 +72,12 @@ def run_simulation(
 
     tb = TransportBlock.from_config(config.embb_config)
     cbgs = group_code_blocks(tb, config.cbg_count)
-    events = generate_urllc_traffic(
-        config.urllc_config,
-        seed,
-        arrival_pattern=config.urllc_arrival_pattern,
-    )
+    if events is None:
+        events = generate_urllc_traffic(
+            config.urllc_config,
+            seed,
+            arrival_pattern=config.urllc_arrival_pattern,
+        )
 
     # Schedule URLLC events subject to per-slot capacity and deadlines.
     scheduler_config = SchedulerConfig(
@@ -91,27 +95,50 @@ def run_simulation(
     # Explicit experimental mapping: each successfully served abstract URLLC
     # resource-demand unit consumes one eligible mapped eMBB position.
     # Fixed fraction/count settings remain in control for RQ2/RQ3.
-    preemption_kwargs = {
-        "preemption_fraction": config.preemption_fraction,
-        "num_preempt": config.num_preempt,
-    }
+    
+    if preemption_positions is None:
+        preemption_kwargs = {
+            "preemption_fraction": config.preemption_fraction,
+            "num_preempt": config.num_preempt,
+        }
 
-    if (
-        config.preemption_fraction is None
-        and config.num_preempt is None
-    ):
-        preemption_kwargs["num_preempt"] = min(
-            successful_demand,
-            len(tb.used_positions()),
+        if (
+            config.preemption_fraction is None
+            and config.num_preempt is None
+        ):
+            preemption_kwargs["num_preempt"] = min(
+                successful_demand,
+                len(tb.used_positions()),
+            )
+
+        preemption = generate_preemption(
+            tb,
+            events,
+            config.preemption_pattern,
+            **preemption_kwargs,
+            seed=seed,
         )
+    else:
+        selected = tuple(preemption_positions)
+        eligible = set(tb.used_positions())
 
-    preemption = generate_preemption(
-        tb,
-        events,
-        config.preemption_pattern,
-        **preemption_kwargs,
-        seed=seed,
-    )
+        if len(set(selected)) != len(selected):
+            raise ValueError("preemption_positions must be unique")
+
+        if not set(selected).issubset(eligible):
+            raise ValueError(
+                "preemption_positions must belong to the transport block"
+            )
+
+        preemption = PreemptionResult(
+            pattern=config.preemption_pattern,
+            requested_count=len(selected),
+            total_embb_positions=len(eligible),
+            preempted_positions=tuple(
+                sorted(selected, key=lambda p: (p.symbol, p.subcarrier))
+            ),
+            seed=seed if config.preemption_pattern == "random" else None,
+        )
 
     cb_ids = tb.affected_cb_ids(preemption.preempted_positions)
     cbg_ids = affected_cbg_ids(cbgs, cb_ids)
