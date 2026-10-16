@@ -421,19 +421,25 @@ def plot_rq2(
         ),
     ]
 
+
 def plot_rq3_failure_occurrence_rate(
         df: pd.DataFrame,
         output_dir: Path = FIGURES_DIR,
-
 ) -> Path:
-    """Plot the proportion of runs with at least one failed CBG for each CBG count."""
+    """Plot failure occurrence using preempted RQ3 runs only."""
+
+    # Exclude no-preemption controls from the RQ3 failure rates.
+    df = df[df["condition"] == "preempted"].copy()
+
     cbg_counts = sorted(df["cbg_count"].unique())
     failure_rates = [
         (df.loc[df["cbg_count"] == count, "failed_cbg_count"] > 0).mean()
         for count in cbg_counts
     ]
+
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
     bars = ax.bar(cbg_counts, failure_rates, alpha=0.75, width=0.9)
+
     for bar, rate in zip(bars, failure_rates):
         ax.annotate(
             f"{rate:.1%}",
@@ -451,11 +457,13 @@ def plot_rq3_failure_occurrence_rate(
     ax.set_ylim(0, 1.05)
     ax.grid(axis="y", alpha=0.25)
     ax.set_axisbelow(True)
+
     return _save(
         fig,
         "rq3_failure_occurrence_rate.png",
         output_dir,
     )
+
 
 def plot_rq3(
         df: pd.DataFrame,
